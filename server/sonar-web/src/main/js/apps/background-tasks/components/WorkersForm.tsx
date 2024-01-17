@@ -25,7 +25,7 @@ import { Alert } from 'sonar-ui-common/components/ui/Alert';
 import { translate } from 'sonar-ui-common/helpers/l10n';
 import { setWorkerCount } from '../../../api/ce';
 
-const MAX_WORKERS = 10;
+const MAX_WORKERS = 32;
 
 interface Props {
   onClose: (newWorkerCount?: number) => void;
