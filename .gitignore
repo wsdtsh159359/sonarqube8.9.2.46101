@@ -70,4 +70,5 @@ scripts/patches/*license*.txt
 !scripts/patches/postgres.sh
 gherkin-features/
 
-server/sonar-db-migration
+server/sonar-db-migration/src/main/java/org/sonar/server/platform/db/migration/version/v84/permissiontemplates/fk/
+
