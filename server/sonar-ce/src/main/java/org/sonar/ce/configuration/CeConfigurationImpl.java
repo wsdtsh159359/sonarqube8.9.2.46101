@@ -32,7 +32,7 @@ import static org.sonar.process.ProcessProperties.Property.CE_GRACEFUL_STOP_TIME
  */
 public class CeConfigurationImpl implements CeConfiguration {
   private static final int DEFAULT_WORKER_THREAD_COUNT = 1;
-  private static final int MAX_WORKER_THREAD_COUNT = 10;
+  private static final int MAX_WORKER_THREAD_COUNT = 32;
   private static final int DEFAULT_WORKER_COUNT = 1;
   // 2 seconds
   private static final long DEFAULT_QUEUE_POLLING_DELAY = 2 * 1000L;
@@ -55,16 +55,21 @@ public class CeConfigurationImpl implements CeConfiguration {
     this.workerCountProvider = workerCountProvider;
     this.gracefulStopTimeoutInMs = configuration.getLong(CE_GRACEFUL_STOP_TIMEOUT.getKey())
       .orElse(Long.parseLong(CE_GRACEFUL_STOP_TIMEOUT.getDefaultValue()));
-    if (workerCountProvider == null) {
-      this.workerCount = DEFAULT_WORKER_COUNT;
-      this.workerThreadCount = DEFAULT_WORKER_THREAD_COUNT;
-    } else {
-      this.workerCount = readWorkerCount(workerCountProvider);
-      this.workerThreadCount = MAX_WORKER_THREAD_COUNT;
-    }
+//    if (workerCountProvider == null) {
+//      this.workerCount = DEFAULT_WORKER_COUNT;
+//      this.workerThreadCount = DEFAULT_WORKER_THREAD_COUNT;
+//    } else {
+//      this.workerCount = readWorkerCount(workerCountProvider);
+//      this.workerThreadCount = MAX_WORKER_THREAD_COUNT;
+//    }
+    this.workerCount = readWorkerCount(workerCountProvider);
+    this.workerThreadCount = MAX_WORKER_THREAD_COUNT;
   }
 
   private static synchronized int readWorkerCount(WorkerCountProvider workerCountProvider) {
+    if(workerCountProvider==null){
+      workerCountProvider=new KingdeeWorkerCountProvider();
+    }
     int value = workerCountProvider.get();
     if (value < DEFAULT_WORKER_COUNT || value > MAX_WORKER_THREAD_COUNT) {
       throw parsingError(value);
