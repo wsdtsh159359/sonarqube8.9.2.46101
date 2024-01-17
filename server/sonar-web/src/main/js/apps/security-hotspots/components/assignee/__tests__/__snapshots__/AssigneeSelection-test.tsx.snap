@@ -1,0 +1,18 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`should render correctly 1`] = `
+<AssigneeSelectionRenderer
+  loading={false}
+  onKeyDown={[Function]}
+  onSearch={[Function]}
+  onSelect={[MockFunction]}
+  suggestedUsers={
+    Array [
+      Object {
+        "login": "",
+        "name": "unassigned",
+      },
+    ]
+  }
+/>
+`;

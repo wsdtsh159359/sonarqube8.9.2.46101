@@ -1,0 +1,23 @@
+{
+  "paging": {
+    "pageIndex": 1,
+    "pageSize": 100,
+    "total": 2
+  },
+  "groups": [
+    {
+      "id": "AU-Tpxb--iU5OvuD2FLy",
+      "name": "sonar-users",
+      "description": "Users",
+      "membersCount": 17,
+      "default": true
+    },
+    {
+      "id": "AU-Tpxb--iU5OvuD2FLz",
+      "name": "administrators",
+      "description": "Administrators",
+      "membersCount": 2,
+      "default": false
+    }
+  ]
+}

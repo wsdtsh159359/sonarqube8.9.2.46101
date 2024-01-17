@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "mybatis-3-mapper.dtd">
+
+<mapper namespace="org.sonar.db.qualitygate.QualityGateMapper">
+
+  <sql id="gateColumns">
+      uuid, name, is_built_in as isBuiltIn, created_at as createdAt, updated_at as updatedAt
+  </sql>
+
+  <insert id="insertQualityGate" parameterType="QualityGate" useGeneratedKeys="false">
+    insert into quality_gates (uuid, name, is_built_in, created_at, updated_at)
+    values (#{uuid, jdbcType=VARCHAR}, #{name, jdbcType=VARCHAR}, #{isBuiltIn, jdbcType=BOOLEAN}, #{createdAt, jdbcType=TIMESTAMP}, #{updatedAt, jdbcType=TIMESTAMP})
+  </insert>
+
+  <select id="selectAll" resultType="QualityGate">
+    SELECT
+    <include refid="gateColumns"/>
+    FROM quality_gates qg
+    ORDER BY qg.name ASC
+  </select>
+
+  <select id="selectByName" parameterType="String" resultType="QualityGate">
+    select
+    <include refid="gateColumns"/>
+    from quality_gates
+    where name=#{name, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByUuid" parameterType="String" resultType="QualityGate">
+    select
+    <include refid="gateColumns"/>
+    from quality_gates
+    where uuid=#{uuid, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByProjectUuid" parameterType="Map" resultType="org.sonar.db.qualitygate.QualityGateDto">
+    SELECT
+    <include refid="gateColumns"/>
+    FROM
+    quality_gates qg
+    INNER JOIN
+    project_qgates pqg ON pqg.quality_gate_uuid = qg.uuid AND pqg.project_uuid = #{projectUuid, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectBuiltIn" resultType="org.sonar.db.qualitygate.QualityGateDto">
+    SELECT
+      <include refid="gateColumns"/>
+    FROM quality_gates
+    WHERE
+      is_built_in = ${_true}
+  </select>
+
+  <update id="delete" parameterType="String">
+    delete from quality_gates where uuid=#{uuid}
+  </update>
+
+  <update id="deleteByUuids" parameterType="map">
+    delete from quality_gates
+    where uuid in
+    <foreach collection="uuids" open="(" close=")" item="uuid" separator=",">#{uuid, jdbcType=VARCHAR}</foreach>
+  </update>
+
+  <update id="update" parameterType="QualityGate">
+    update quality_gates set
+    name=#{name},
+    is_built_in=#{isBuiltIn, jdbcType=BOOLEAN},
+    updated_at=#{updatedAt, jdbcType=TIMESTAMP}
+    where uuid=#{uuid, jdbcType=VARCHAR}
+  </update>
+
+  <update id="ensureOneBuiltInQualityGate" parameterType="string">
+    UPDATE quality_gates
+    SET
+      is_built_in=${_false}
+    WHERE
+      is_built_in=${_true} AND name &lt;&gt; #{builtInQualityName, jdbcType=VARCHAR}
+  </update>
+
+</mapper>
+

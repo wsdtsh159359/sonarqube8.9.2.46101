@@ -70,4 +70,4 @@ scripts/patches/*license*.txt
 !scripts/patches/postgres.sh
 gherkin-features/
 
-server
+server/sonar-db-migration

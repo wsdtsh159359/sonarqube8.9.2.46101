@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "mybatis-3-mapper.dtd">
+
+<mapper namespace="org.sonar.db.permission.GroupPermissionMapper">
+
+  <select id="groupsCountByProjectUuidAndPermission" parameterType="map"
+          resultType="org.sonar.db.permission.CountPerProjectPermission">
+    SELECT
+      count(1) as count,
+      permission,
+      componentUuid
+    FROM (
+      SELECT
+        g.name as name,
+        group_role.role as permission,
+        group_role.component_uuid as componentUuid
+      FROM
+        groups g
+      INNER JOIN group_roles group_role ON
+        group_role.group_uuid=g.uuid
+      UNION
+      -- Add Anyone group permission
+      SELECT
+        #{anyoneGroup} as name,
+        group_role.role as permission,
+        group_role.component_uuid as componentUuid
+      FROM
+        group_roles group_role
+      where
+        group_role.group_uuid IS NULL
+    ) groups
+    where
+      groups.componentUuid in
+      <foreach collection="componentUuids" open="(" close=")" item="id" separator=",">
+        #{id,jdbcType=VARCHAR}
+      </foreach>
+    GROUP BY
+      groups.permission,
+      groups.componentUuid
+  </select>
+
+  <select id="selectGroupNamesByQuery" parameterType="map" resultType="string">
+    select sub.name, lower(sub.name), sub.groupUuid
+    <include refid="groupsByQuery"/>
+    group by sub.name, lower(sub.name), sub.groupUuid
+    order by case when (count(sub.permission) > 0) then 1 else 2 end asc, lower(sub.name), sub.name, sub.groupUuid
+  </select>
+
+  <select id="countGroupsByQuery" parameterType="map" resultType="int">
+    select count(1)
+    from (
+      select distinct sub.groupUuid
+      <include refid="groupsByQuery"/>) g
+  </select>
+
+  <sql id="groupsByQuery">
+    from (
+      select g.uuid as groupUuid, g.name as name, gr.role as permission, gr.component_uuid as componentUuid, gr.uuid as uuid
+      from groups g
+      left join group_roles gr on g.uuid = gr.group_uuid
+      <if test="query.componentUuid == null">
+        and gr.component_uuid is null
+      </if>
+      <if test="query.componentUuid != null">
+        and gr.component_uuid = #{query.componentUuid,jdbcType=VARCHAR}
+      </if>
+
+    union all
+
+    select 'Anyone' as groupUuid, 'Anyone' as name, gr.role as permission, gr.component_uuid as componentUuid, gr.uuid as uuid
+    from group_roles gr
+    <where>
+      <if test="query.componentUuid == null">
+        and gr.component_uuid is null
+      </if>
+      <if test="query.componentUuid != null">
+        and gr.component_uuid = #{query.componentUuid,jdbcType=VARCHAR}
+      </if>
+      <if test="query.withAtLeastOnePermission()">
+        and gr.group_uuid is null
+      </if>
+    </where>
+
+    ) sub
+    left join components p on sub.componentUuid = p.uuid
+    <where>
+      <if test="query.searchQueryToSql != null">
+        and lower(sub.name) like #{query.searchQueryToSqlLowercase,jdbcType=VARCHAR} ESCAPE '/'
+      </if>
+      <!-- filter rows with group permissions -->
+      <if test="query.withAtLeastOnePermission()">
+        and sub.permission is not null
+        <if test="query.componentUuid==null">
+          and sub.componentUuid is null
+        </if>
+        <if test="query.componentUuid!=null">
+          and p.uuid = #{query.componentUuid,jdbcType=VARCHAR}
+        </if>
+        <if test="query.permission!=null">
+          and sub.permission = #{query.permission,jdbcType=VARCHAR}
+        </if>
+      </if>
+    </where>
+  </sql>
+
+  <select id="selectByGroupUuids" parameterType="map" resultType="GroupPermission">
+    select sub.groupUuid as groupUuid, sub.componentUuid as componentUuid, sub.permission as role
+    from
+      (
+      select gr.group_uuid as groupUuid, gr.component_uuid as componentUuid, gr.role as permission, g.name as name
+      from group_roles gr
+      inner join groups g ON g.uuid = gr.group_uuid
+      where gr.group_uuid is not null
+
+      union all
+
+      select 'Anyone' as groupUuid, gr.component_uuid as componentUuid, gr.role as permission, 'Anyone' as name
+      from group_roles gr
+      where
+      gr.group_uuid is null
+      ) sub
+    where
+      sub.groupUuid in
+      <foreach collection="groupUuids" open="(" close=")" item="groupUuid" separator=",">
+        #{groupUuid,jdbcType=VARCHAR}
+      </foreach>
+      <if test="projectUuid != null">
+        and sub.componentUuid=#{projectUuid,jdbcType=VARCHAR}
+      </if>
+      <if test="projectUuid==null">
+        and sub.componentUuid is null
+      </if>
+  </select>
+
+  <select id="selectGlobalPermissionsOfGroup" parameterType="map" resultType="String">
+    select gr.role
+    from group_roles gr
+    where
+    gr.component_uuid is null and
+    <choose>
+      <when test="groupUuid != null">
+        gr.group_uuid = #{groupUuid,jdbcType=VARCHAR}
+      </when>
+      <otherwise>
+        gr.group_uuid is null
+      </otherwise>
+    </choose>
+  </select>
+
+  <select id="selectProjectPermissionsOfGroup" parameterType="map" resultType="String">
+    select gr.role
+    from group_roles gr
+    where
+    gr.component_uuid = #{projectUuid,jdbcType=VARCHAR} and
+    <choose>
+      <when test="groupUuid != null">
+        gr.group_uuid = #{groupUuid,jdbcType=VARCHAR}
+      </when>
+      <otherwise>
+        gr.group_uuid is null
+      </otherwise>
+    </choose>
+  </select>
+
+  <select id="selectAllPermissionsByGroupUuid" parameterType="map" resultType="GroupPermission">
+    select gr.group_uuid as groupUuid, gr.component_uuid as componentUuid, gr.role as role
+    from group_roles gr
+    where gr.group_uuid = #{groupUuid,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectGroupUuidsWithPermissionOnProjectBut" resultType="string">
+    select
+      distinct gr1.group_uuid
+    from
+      group_roles gr1
+    where
+      gr1.component_uuid = #{projectUuid,jdbcType=VARCHAR}
+      and gr1.group_uuid is not null
+      and not exists (
+        select
+          1
+        from
+          group_roles gr2
+        where
+          gr2.component_uuid = gr1.component_uuid
+          and gr2.group_uuid = gr1.group_uuid
+          and gr2.role = #{role,jdbcType=VARCHAR}
+      )
+  </select>
+
+  <insert id="insert" parameterType="GroupPermission">
+    insert into group_roles (
+    uuid,
+    group_uuid,
+    component_uuid,
+    role
+    ) values (
+    #{uuid,jdbcType=VARCHAR},
+    #{groupUuid,jdbcType=VARCHAR},
+    #{componentUuid,jdbcType=BIGINT},
+    #{role,jdbcType=VARCHAR}
+    )
+  </insert>
+
+  <delete id="deleteByRootComponentUuid" parameterType="String">
+    delete from group_roles
+    where component_uuid=#{rootComponentUuid,jdbcType=VARCHAR}
+  </delete>
+
+  <delete id="deleteByRootComponentUuidAndGroupUuid">
+    delete from
+      group_roles
+    where
+      component_uuid=#{rootComponentUuid,jdbcType=VARCHAR}
+      <choose>
+        <when test="groupUuid != null">
+          and group_uuid = #{groupUuid,jdbcType=VARCHAR}
+        </when>
+        <otherwise>
+          and group_uuid is null
+        </otherwise>
+      </choose>
+  </delete>
+
+  <delete id="deleteByRootComponentUuidAndPermission">
+    delete from
+      group_roles
+    where
+      component_uuid=#{rootComponentUuid,jdbcType=VARCHAR}
+      and role=#{permission,jdbcType=VARCHAR}
+  </delete>
+
+  <delete id="delete" parameterType="map">
+    delete from group_roles
+    where
+    role=#{permission,jdbcType=VARCHAR} and
+    <choose>
+      <when test="rootComponentUuid != null">
+        component_uuid=#{rootComponentUuid,jdbcType=BIGINT}
+      </when>
+      <otherwise>
+        component_uuid is null
+      </otherwise>
+    </choose>
+    and
+    <choose>
+      <when test="groupUuid != null">
+        group_uuid=#{groupUuid,jdbcType=VARCHAR}
+      </when>
+      <otherwise>
+        group_uuid is null
+      </otherwise>
+    </choose>
+  </delete>
+</mapper>

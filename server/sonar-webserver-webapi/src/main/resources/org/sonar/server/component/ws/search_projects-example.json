@@ -1,0 +1,74 @@
+{
+  "paging": {
+    "pageIndex": 1,
+    "pageSize": 100,
+    "total": 3
+  },
+  "components": [
+    {
+      "key": "my_project",
+      "name": "My Project 1",
+      "qualifier": "TRK",
+      "isFavorite": true,
+      "tags": [
+        "finance",
+        "java"
+      ],
+      "visibility": "public",
+      "needIssueSync": true
+    },
+    {
+      "key": "another_project",
+      "name": "My Project 2",
+      "qualifier": "TRK",
+      "isFavorite": false,
+      "tags": [],
+      "visibility": "public",
+      "needIssueSync": false
+    },
+    {
+      "key": "third_project",
+      "name": "My Project 3",
+      "qualifier": "TRK",
+      "isFavorite": false,
+      "tags": [
+        "sales",
+        "offshore",
+        "java"
+      ],
+      "visibility": "public",
+      "needIssueSync": false
+    }
+  ],
+  "facets": [
+    {
+      "property": "coverage",
+      "values": [
+        {
+          "val": "NO_DATA",
+          "count": 0
+        },
+        {
+          "val": "*-30.0",
+          "count": 1
+        },
+        {
+          "val": "30.0-50.0",
+          "count": 0
+        },
+        {
+          "val": "50.0-70.0",
+          "count": 0
+        },
+        {
+          "val": "70.0-80.0",
+          "count": 0
+        },
+        {
+          "val": "80.0-*",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "mybatis-3-mapper.dtd">
+<mapper namespace="org.sonar.db.component.BranchMapper">
+
+  <sql id="columns">
+    pb.uuid as uuid,
+    pb.project_uuid as projectUuid,
+    pb.kee as kee,
+    pb.branch_type as branchType,
+    pb.merge_branch_uuid as mergeBranchUuid,
+    pb.pull_request_binary as pullRequestBinary,
+    pb.exclude_from_purge as excludeFromPurge,
+    pb.need_issue_sync as needIssueSync
+  </sql>
+
+  <insert id="insert" parameterType="map" useGeneratedKeys="false">
+    insert into project_branches (
+    uuid,
+    project_uuid,
+    kee,
+    branch_type,
+    merge_branch_uuid,
+    pull_request_binary,
+    created_at,
+    updated_at,
+    exclude_from_purge,
+    need_issue_sync
+    ) values (
+    #{dto.uuid, jdbcType=VARCHAR},
+    #{dto.projectUuid, jdbcType=VARCHAR},
+    #{dto.kee, jdbcType=VARCHAR},
+    #{dto.branchType, jdbcType=VARCHAR},
+    #{dto.mergeBranchUuid, jdbcType=VARCHAR},
+    #{dto.pullRequestBinary, jdbcType=BINARY},
+    #{now, jdbcType=BIGINT},
+    #{now, jdbcType=BIGINT},
+    #{dto.excludeFromPurge, jdbcType=BOOLEAN},
+    #{dto.needIssueSync, jdbcType=BOOLEAN}
+    )
+  </insert>
+
+  <update id="updateMainBranchName" parameterType="map">
+    update project_branches
+    set
+      kee = #{newBranchName, jdbcType=VARCHAR},
+      updated_at = #{now, jdbcType=BIGINT}
+    where
+      uuid = #{projectUuid, jdbcType=VARCHAR}
+  </update>
+
+  <delete id="deleteBranch" parameterType="string">
+    delete from project_branches
+    where
+      project_uuid = #{projectUuid, jdbcType=VARCHAR},
+      kee = #{branchKey, jdbcType=VARCHAR}
+  </delete>
+
+  <update id="updateExcludeFromPurge">
+    update project_branches
+    set
+      exclude_from_purge = #{excludeFromPurge, jdbcType=BOOLEAN},
+      updated_at = #{now, jdbcType=BIGINT}
+    where
+      uuid = #{uuid, jdbcType=VARCHAR}
+  </update>
+
+  <update id="update" parameterType="map" useGeneratedKeys="false">
+    update project_branches
+    set
+      merge_branch_uuid = #{dto.mergeBranchUuid, jdbcType=VARCHAR},
+      pull_request_binary = #{dto.pullRequestBinary, jdbcType=BINARY},
+      updated_at = #{now, jdbcType=BIGINT}
+    where
+      uuid = #{dto.uuid, jdbcType=VARCHAR}
+  </update>
+
+  <select id="selectByKey" resultType="org.sonar.db.component.BranchDto">
+    select <include refid="columns"/>
+    from project_branches pb
+    where
+      pb.project_uuid = #{projectUuid, jdbcType=VARCHAR} and
+      pb.kee = #{key, jdbcType=VARCHAR} and
+      pb.branch_type = #{branchType, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByBranchKeys" resultType="org.sonar.db.component.BranchDto">
+    select
+    <include refid="columns"/>
+    from project_branches pb
+    where
+    <foreach collection="branchKeyByProjectUuid" index="key" item="value" open="" separator=" or " close="">
+        (pb.project_uuid=#{key,jdbcType=VARCHAR} and pb.kee=#{value,jdbcType=VARCHAR})
+    </foreach>
+  </select>
+
+  <select id="selectByProjectUuid" parameterType="string" resultType="org.sonar.db.component.BranchDto">
+    select <include refid="columns"/>
+    from project_branches pb
+    where
+    pb.project_uuid = #{projectUuid, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByUuids" resultType="org.sonar.db.component.BranchDto">
+    select <include refid="columns"/>
+    from project_branches pb
+    where
+    pb.uuid in
+    <foreach collection="uuids" open="(" close=")" item="uuid" separator=",">
+      #{uuid,jdbcType=VARCHAR}
+    </foreach>
+  </select>
+
+  <select id="selectByUuid" resultType="org.sonar.db.component.BranchDto">
+    select
+    <include refid="columns"/>
+    from project_branches pb
+    where
+    pb.uuid = #{uuid, jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectProjectUuidsWithIssuesNeedSync" resultType="String">
+    select distinct pb.project_uuid
+    from project_branches pb
+    where pb.need_issue_sync = ${_true}
+    and pb.project_uuid in
+    <foreach collection="projectUuids" open="(" close=")" item="uuid" separator=",">
+      #{uuid,jdbcType=VARCHAR}
+    </foreach>
+  </select>
+
+  <select id="countNonMainBranches" resultType="long">
+    select count(pb.uuid)
+    from project_branches pb
+    where
+    pb.uuid &lt;&gt; pb.project_uuid
+  </select>
+
+  <select id="countByTypeAndCreationDate" parameterType="map" resultType="long">
+    select count(pb.uuid)
+    from project_branches pb
+    where
+    pb.branch_type = #{branchType, jdbcType=VARCHAR}
+    and pb.created_at &gt;= #{sinceDate, jdbcType=BIGINT}
+  </select>
+
+  <sql id="hasAnyBranchWhereNeedIssueSyncSql">
+    select
+    case when exists
+    (
+    select pb.uuid from project_branches pb where need_issue_sync = #{needIssueSync, jdbcType=BOOLEAN}
+    )
+    then 1
+    else 0
+    end
+  </sql>
+
+  <select id="hasAnyBranchWhereNeedIssueSync" parameterType="map" resultType="short">
+    <include refid="hasAnyBranchWhereNeedIssueSyncSql"/>
+  </select>
+
+  <select id="hasAnyBranchWhereNeedIssueSync" parameterType="map" resultType="short" databaseId="oracle">
+    <include refid="hasAnyBranchWhereNeedIssueSyncSql"/>
+    from dual
+  </select>
+
+  <select id="countByNeedIssueSync" parameterType="map" resultType="int">
+    select
+    count(pb.uuid)
+    from project_branches pb
+    where
+    pb.need_issue_sync = #{needIssueSync, jdbcType=BOOLEAN}
+  </select>
+
+  <select id="countAll" parameterType="map" resultType="int">
+    select
+    count(pb.uuid)
+    from project_branches pb
+  </select>
+
+  <select id="selectBranchNeedingIssueSync" resultType="org.sonar.db.component.BranchDto">
+    select
+    <include refid="columns"/>
+    from project_branches pb
+    where need_issue_sync = ${_true}
+    order by pb.updated_at desc, uuid
+  </select>
+
+  <update id="updateAllNeedIssueSync">
+    update project_branches
+    set
+      need_issue_sync = ${_true},
+      updated_at = #{now, jdbcType=BIGINT}
+  </update>
+
+  <update id="updateNeedIssueSync">
+    update project_branches
+    set
+      need_issue_sync = #{needIssueSync, jdbcType=BOOLEAN},
+      updated_at = #{now, jdbcType=BIGINT}
+    where
+      uuid = #{uuid, jdbcType=VARCHAR}
+  </update>
+
+  <sql id="doAnyOfComponentsNeedIssueSyncSql">
+    select
+    case when exists
+    (
+    select pb.project_uuid, pb.need_issue_sync from project_branches pb join components c on pb.project_uuid =
+    c.project_uuid
+    where c.kee in
+    <foreach collection="componentKeys" open="(" close=")" item="componentKey" separator=",">
+      #{componentKey,jdbcType=VARCHAR}
+    </foreach>
+    and pb.need_issue_sync = ${_true}
+    )
+    then 1
+    else 0
+    end
+  </sql>
+
+  <select id="doAnyOfComponentsNeedIssueSync" parameterType="map" resultType="short">
+    <include refid="doAnyOfComponentsNeedIssueSyncSql"/>
+  </select>
+
+  <select id="doAnyOfComponentsNeedIssueSync" parameterType="map" resultType="short" databaseId="oracle">
+    <include refid="doAnyOfComponentsNeedIssueSyncSql"/>
+    from dual
+  </select>
+
+</mapper>
