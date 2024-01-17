@@ -20,9 +20,13 @@
 package org.sonar.server.ce.ws;
 
 import javax.annotation.Nullable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
+import org.sonar.ce.configuration.KingdeeWorkerCountProvider;
 import org.sonar.ce.configuration.WorkerCountProvider;
 import org.sonar.server.user.UserSession;
 import org.sonarqube.ws.Ce.WorkerCountResponse;
@@ -32,10 +36,13 @@ import static org.sonar.server.ce.ws.CeWsParameters.ACTION_WORKER_COUNT;
 
 public class WorkerCountAction implements CeWsAction {
 
+
+  private static final Logger logger = LoggerFactory.getLogger(WorkerCountAction.class);
+
   private static final int DEFAULT_WORKER_COUNT = 1;
 
   private final UserSession userSession;
-  private final WorkerCountProvider workerCountProvider;
+  private WorkerCountProvider workerCountProvider;
 
   public WorkerCountAction(UserSession userSession, @Nullable WorkerCountProvider workerCountProvider) {
     this.userSession = userSession;
@@ -66,9 +73,11 @@ public class WorkerCountAction implements CeWsAction {
   private WorkerCountResponse createResponse(){
     WorkerCountResponse.Builder builder = WorkerCountResponse.newBuilder();
     if (workerCountProvider == null) {
+      logger.info("workerCountProvider为空，取默认值");
+      workerCountProvider=new KingdeeWorkerCountProvider();
       return builder
-        .setValue(DEFAULT_WORKER_COUNT)
-        .setCanSetWorkerCount(false)
+        .setValue(workerCountProvider.get())
+        .setCanSetWorkerCount(true)
         .build();
     }
     return builder
