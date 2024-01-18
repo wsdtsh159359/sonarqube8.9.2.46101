@@ -23,18 +23,22 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.google.common.base.Throwables;
 import java.io.File;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.startup.Tomcat;
 import org.slf4j.LoggerFactory;
 import org.sonar.api.utils.log.Loggers;
+import org.sonar.ce.configuration.CeWorkCountEnum;
 import org.sonar.process.Props;
 
 import static org.sonar.core.util.FileUtils.deleteQuietly;
 import static org.sonar.process.ProcessProperties.Property.PATH_TEMP;
 
 class EmbeddedTomcat {
+
+  private static final org.sonar.api.utils.log.Logger LOG = Loggers.get(EmbeddedTomcat.class);
 
   private final Props props;
   private Tomcat tomcat = null;
@@ -64,6 +68,17 @@ class EmbeddedTomcat {
     new TomcatErrorHandling().configure(tomcat);
     new TomcatAccessLog().configure(tomcat, props);
     TomcatConnectors.configure(tomcat, props);
+    //配置
+    Properties properties=props.rawProperties();
+    if(properties!=null){
+      LOG.info(properties.getProperty("sonar.ce.workCount"));
+      String configValue=properties.getProperty("sonar.ce.workCount");
+      if(configValue!=null&&!"".equals(configValue)){
+        CeWorkCountEnum.WORK_COUNT.setNum(Integer.valueOf(configValue));
+      }
+    }else{
+      LOG.info("CE容器引擎无法获取到sonar.ce.workCount");
+    }
     webappContext = new TomcatContexts().configure(tomcat, props);
     try {
       // let Tomcat temporarily log errors at start up - for example, port in use

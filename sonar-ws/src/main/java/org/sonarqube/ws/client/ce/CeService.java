@@ -254,4 +254,13 @@ public class CeService extends BaseService {
       new GetRequest(path("worker_count")),
       WorkerCountResponse.parser());
   }
+
+
+  //TODO 设置修改CE线程数
+//  public WorkerCountResponse setWorkerCount() {
+//    return call(
+//            new PostRequest(path("set_worker_count")),
+//            WorkerCountResponse.parser());
+//  }
+
 }

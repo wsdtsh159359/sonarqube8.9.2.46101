@@ -22,6 +22,7 @@ package org.sonar.ce.container;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.List;
+import java.util.Properties;
 import javax.annotation.CheckForNull;
 import org.sonar.api.SonarEdition;
 import org.sonar.api.SonarQubeSide;
@@ -42,6 +43,7 @@ import org.sonar.api.utils.Durations;
 import org.sonar.api.utils.System2;
 import org.sonar.api.utils.UriReader;
 import org.sonar.api.utils.Version;
+import org.sonar.api.utils.log.Logger;
 import org.sonar.api.utils.log.Loggers;
 import org.sonar.ce.CeConfigurationModule;
 import org.sonar.ce.CeDistributedInformationImpl;
@@ -52,6 +54,7 @@ import org.sonar.ce.StandaloneCeDistributedInformation;
 import org.sonar.ce.async.SynchronousAsyncExecution;
 import org.sonar.ce.cleaning.CeCleaningModule;
 import org.sonar.ce.cleaning.NoopCeCleaningSchedulerImpl;
+import org.sonar.ce.configuration.CeWorkCountEnum;
 import org.sonar.ce.db.ReadOnlyPropertiesDao;
 import org.sonar.ce.issue.index.NoAsyncIssueIndexing;
 import org.sonar.ce.logging.CeProcessLogging;
@@ -79,11 +82,7 @@ import org.sonar.core.platform.PlatformEditionProvider;
 import org.sonar.core.platform.PluginClassLoader;
 import org.sonar.core.platform.PluginClassloaderFactory;
 import org.sonar.core.util.UuidFactoryImpl;
-import org.sonar.db.DBSessionsImpl;
-import org.sonar.db.DaoModule;
-import org.sonar.db.DbClient;
-import org.sonar.db.DefaultDatabase;
-import org.sonar.db.MyBatis;
+import org.sonar.db.*;
 import org.sonar.db.purge.PurgeProfiler;
 import org.sonar.process.NetworkUtilsImpl;
 import org.sonar.process.Props;
@@ -161,6 +160,8 @@ import static org.sonar.process.ProcessProperties.Property.SONARCLOUD_ENABLED;
 
 public class ComputeEngineContainerImpl implements ComputeEngineContainer {
 
+  private static final Logger LOG = Loggers.get(ComputeEngineContainerImpl.class);
+
   private ComputeEngineStatus computeEngineStatus;
   @CheckForNull
   private ComponentContainer level1;
@@ -174,6 +175,16 @@ public class ComputeEngineContainerImpl implements ComputeEngineContainer {
 
   @Override
   public ComputeEngineContainer start(Props props) {
+    Properties properties=props.rawProperties();
+    if(properties!=null){
+      LOG.info(properties.getProperty("sonar.ce.workCount"));
+      String configValue=properties.getProperty("sonar.ce.workCount");
+      if(configValue!=null&&!"".equals(configValue)){
+        CeWorkCountEnum.WORK_COUNT.setNum(Integer.valueOf(configValue));
+      }
+    }else{
+      LOG.info("CE容器引擎无法获取到sonar.ce.workCount");
+    }
     this.level1 = new ComponentContainer();
     populateLevel1(this.level1, props, requireNonNull(computeEngineStatus));
     configureFromModules(this.level1);
