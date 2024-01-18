@@ -73,17 +73,17 @@ public class WorkerCountAction implements CeWsAction {
   private WorkerCountResponse createResponse(){
     WorkerCountResponse.Builder builder = WorkerCountResponse.newBuilder();
     logger.info("查看workerCountProvider是否为空:"+Boolean.valueOf(workerCountProvider == null));
-    if (workerCountProvider == null) {
+//    if (workerCountProvider == null) {
       workerCountProvider=new KingdeeWorkerCountProvider();
       return builder
         .setValue(workerCountProvider.get())
         .setCanSetWorkerCount(false)
         .build();
-    }
-    return builder
-      .setValue(5)
-      .setCanSetWorkerCount(true)
-      .build();
+//    }
+//    return builder
+//      .setValue(5)
+//      .setCanSetWorkerCount(true)
+//      .build();
   }
 
 }
